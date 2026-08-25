@@ -1,5 +1,6 @@
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from opencode_bridge import send_to_opencode
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -13,43 +14,46 @@ class RequestHandler(BaseHTTPRequestHandler):
         try:
             content_length = int(self.headers.get("Content-Length", 0))
             post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode("utf-8"))
 
-            user_message = data.get("message", "")
+            data = json.loads(post_data.decode("utf-8"))
+            user_message = data.get("message", "").strip()
+
+            if not user_message:
+                raise ValueError("Message cannot be empty.")
+
             print(f"Received message: {user_message}")
 
-            # Temporary response.
-            # OpenCode integration will replace this later.
+            opencode_reply = send_to_opencode(user_message)
+
             response_data = {
-                "message": f"Bridge received: '{user_message}'"
+                "message": opencode_reply
             }
-
-            response = json.dumps(response_data).encode("utf-8")
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(response)))
-            self.end_headers()
-            self.wfile.write(response)
+            status_code = 200
 
         except Exception as e:
-            error = json.dumps({"message": f"Server error: {e}"}).encode("utf-8")
+            response_data = {
+                "message": f"[Server Error]: {e}"
+            }
+            status_code = 500
 
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(error)))
-            self.end_headers()
-            self.wfile.write(error)
+        response = json.dumps(response_data).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(response)))
+        self.end_headers()
+        self.wfile.write(response)
 
 
 def run():
-    # Listen on all interfaces so the Android-to-Termux connection
-    # can be configured properly later.
+    # Listen on all interfaces so Android can reach the bridge.
     server_address = ("0.0.0.0", 8080)
 
     httpd = HTTPServer(server_address, RequestHandler)
 
     print("Starting Our AI Broker bridge on port 8080...")
+    print("OpenCode integration enabled.")
+
     httpd.serve_forever()
 
 
