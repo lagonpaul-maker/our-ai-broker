@@ -1,21 +1,34 @@
+
+
+
 import subprocess
+
 
 def send_to_opencode(prompt: str) -> str:
     try:
         result = subprocess.run(
-            ["opencode", "run", prompt],
+            [
+                "proot-distro",
+                "login",
+                "debian",
+                "--",
+                "/usr/local/bin/opencode",
+                "run",
+                prompt
+            ],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120
         )
 
-        if result.returncode == 0:
-            return result.stdout.strip() or "OpenCode returned no text."
+        if result.returncode != 0:
+            error = result.stderr.strip()
+            return f"[OpenCode Error]: {error}"
 
-        return f"[OpenCode Error]: {result.stderr.strip()}"
+        return result.stdout.strip()
 
     except FileNotFoundError:
-        return "[Bridge Error]: OpenCode command not found."
+        return "[Bridge Error]: proot-distro not found."
 
     except subprocess.TimeoutExpired:
         return "[Bridge Error]: OpenCode request timed out."
